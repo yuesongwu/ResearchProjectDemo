@@ -1,0 +1,126 @@
+---
+title: "874hw7"
+author: "Yuesong Wu"
+date: "2022-11-24"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r ,echo=FALSE}
+library(MASS)
+```
+
+# Q1
+
+I set true beta as 1 and 5, true sigma2 as 3. 
+
+## a
+```{r}
+
+set.seed(874)
+n=100
+X <- mvrnorm(n=n,mu = c(1,1),Sigma=diag(1,2,2))
+p = ncol(X)
+truebeta <- c(1,5)
+truesigma2 <- 3
+epsilon <- rnorm(n,0,sqrt(truesigma2))
+Y = X%*%truebeta+epsilon
+#initial
+betatilde = c(1,1)
+M =diag(1,2,2)
+S = 1000
+sigma2list = c(1)
+betalist = matrix(NA,nrow = 2,ncol= (S+1))
+betalist[,1] = mvrnorm(1,betatilde ,sigma2list[1]*solve(M))
+
+for(s in 2:(S+1)){
+  m = solve(M+t(X)%*%X)%*%(t(X)%*%Y + M%*%betatilde)
+  s2 = sigma2list[s-1]*solve(M+t(X)%*%X)
+  betalist[,s]  = mvrnorm(1,mu = m,Sigma = s2)
+  sigma2list[s] = 1/rgamma(1,(n+p)/2,rate = 0.5*( t(Y-X%*%betalist[,s])%*%(Y-X%*%betalist[,s])+t(betalist[,s] - betatilde)%*%M%*%(betalist[,s] - betatilde)   ))
+}
+
+apply(betalist,1,mean)
+quantile(betalist[1,],c(0.025,0.975))
+quantile(betalist[2,],c(0.025,0.975))
+mean(sigma2list)
+quantile(sigma2list,c(0.025,0.975))
+
+
+```
+## b
+
+### (i)
+
+```{r}
+Sigma =  solve(M+t(X)%*%X)
+mu = Sigma%*%(t(X)%*%Y + M%*%betatilde)
+thres = 1e-5
+s21list = c(1)
+s22list  = c(1)
+taulist  = c(1)
+# s21  = solve(1/(Sigma[1,1] -Sigma[1,2]*Sigma[2,2]^(-1)*Sigma[2,1] ) *(n+p)/tau)
+counter = 2
+ELBO = c(5,10)
+while(abs(ELBO[counter] - ELBO[counter-1]) > thres){
+  s21list[counter]  = 1/(1/(Sigma[1,1] -Sigma[1,2]*Sigma[2,2]^(-1)*Sigma[2,1] ) *(n+p)/taulist[counter-1])
+  s22list[counter] = 1/(1/(Sigma[2,2] -Sigma[1,2]*Sigma[1,1]^(-1)*Sigma[2,1] ) *(n+p)/taulist[counter-1])
+  taulist[counter] = t(Y)%*%Y + t(betatilde)%*%M%*%betatilde -2*(t(Y)%*%X + t(betatilde)%*%M)%*%mu + sum(diag((M+t(X)%*%X)%*%matrix(c(s21list[counter]+mu[1]^2,mu[1]*mu[2],mu[1]*mu[2], s22list[counter]+mu[2]^2),2,2)))
+  ELBO[counter+1] = -0.5*(n+p)+0.5*log(s21list[counter]) + 0.5*log(s22list[counter]) +1+(n+p)/2
+  counter = counter+1
+}
+
+beta1_q = rnorm(S,mu[1],sqrt(s21list[counter-1]))
+beta2_q = rnorm(S,mu[2],sqrt(s22list[counter-1]))
+sigma2_q = 1/rgamma(S,(n+p)/2, taulist[counter-1]/2)
+
+mean(beta1_q) 
+mean(beta2_q)
+mean(sigma2_q)
+
+par(mfrow = c(2,2))
+plot(density(sigma2list), main = "sigma2")
+lines(density(sigma2_q),col=2)
+
+plot(density(betalist[1,]),main="beta1 marginal")
+lines(density(beta1_q),col=2)
+
+plot(density(betalist[2,]),main="beta2 marginal")
+lines(density(beta2_q),col=2)
+```
+
+### (ii)
+```{r}
+taulist  = c(1)
+Lambdalist = list(diag(1,2,2))
+# s21  = solve(1/(Sigma[1,1] -Sigma[1,2]*Sigma[2,2]^(-1)*Sigma[2,1] ) *(n+p)/tau)
+counter = 2
+ELBO = c(5,10)
+while(abs(ELBO[counter] - ELBO[counter-1]) > thres){
+  Lambdalist[[counter]] = solve(solve(Sigma)*(n+p)/taulist[counter-1])
+  taulist[counter] = t(Y)%*%Y + t(betatilde)%*%M%*%betatilde -2*(t(Y)%*%X + t(betatilde)%*%M)%*%mu + sum(diag((M+t(X)%*%X)%*%(Lambdalist[[counter]] + mu%*%t(mu))))
+  ELBO[counter+1] = -0.5*(n+p)+0.5*log(det(Lambdalist[[counter]])) +1+(n+p)/2
+  counter = counter+1
+}
+
+beta_q = mvrnorm(S,mu,Lambdalist[[counter-1]])
+sigma2_q = 1/rgamma(S,(n+p)/2, taulist[counter-1]/2)
+
+mean(beta_q[,1]) 
+mean(beta_q[,2])
+mean(sigma2_q)
+
+par(mfrow = c(2,2))
+plot(density(sigma2list), main = "sigma2")
+lines(density(sigma2_q),col=2)
+
+plot(density(betalist[1,]),main="beta1 marginal")
+lines(density(beta_q[,1]),col=2)
+
+plot(density(betalist[2,]),main="beta2 marginal")
+lines(density(beta_q[,2]),col=2)
+
+```
