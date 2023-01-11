@@ -26,7 +26,7 @@ dna_count_test@Dimnames <- list(dna_data[["test_multi_inputs/axis0"]][],dna_data
 
 format(object.size(dna_count_test),units="GB")
 save(dna_count_test,file="./rda_dataset/multiome_test.RData")
-#------------ gene activity matrix(Remy)------------
+#------------ gene activity matrix------------
 h5ls("./Nov9/gene_activity/train_multi_inputs_gam_2000.h5ad")
 # h5dump("./Nov9/gene_activity/train_multi_inputs_gam_2000.h5ad")
 data <-hdf5r::H5File$new(filename = "./Nov9/gene_activity/train_multi_inputs_gam_2000.h5ad",mode = 'r')

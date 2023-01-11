@@ -1,4 +1,4 @@
-setwd("/mnt/home/wuyueson/WorkFiles/KaggleDataset/")
+setwd("~/")
 library(doParallel)
 library(qlcMatrix)
 library(sparseMatrixStats)
