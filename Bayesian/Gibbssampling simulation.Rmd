@@ -1,0 +1,113 @@
+---
+title: "874hw5"
+author: "Yuesong"
+date: "10/21/2022"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Q1
+
+### c Gibbs sampling 
+
+```{r}
+df <- read.table('/Users/lotus/Documents/graduate/phd/second/874/HW/divorce.dat')
+#c
+set.seed(874)
+tau_c = 4
+tau_beta=4
+X <- df$V1
+Y <- df$V2
+n <- nrow(df)
+beta = 0
+c = 0
+z <- rep(0,n)
+z[Y==1] <- runif(sum(Y==1),c,c+1)
+z[Y==0] <- runif(sum(Y==0),c-1,c)
+S = 30000
+C <- c()
+Beta <- c()
+Z <- matrix(,S,n)
+
+rnorm_con<- function(mu,a,b,sigma){
+  u <- runif(1,pnorm((a-mu)/sigma),pnorm((b-mu)/sigma))
+  return(sigma*qnorm(u) + mu)
+}
+
+for(i in 1:S){
+  Beta[i] = rnorm(1,t(z)%*%X/(t(X)%*%X+tau_beta^(-2)),1/sqrt(t(X)%*%X+tau_beta^(-2)))
+  C[i] = rnorm_con(0,max(z[Y==0]), min(z[Y==1]), tau_c)
+  X1 <- matrix(X[which(Y==1)])
+  X2 <- matrix(X[which(Y==0)])
+  Z[i,Y==1] = apply(X1*beta,1,rnorm_con,c,Inf,1)
+  Z[i,Y==0] = apply(X2*beta,1,rnorm_con,-Inf,c,1)
+  beta <- Beta[i]
+  c = C[i]
+  z = Z[i,]
+}
+
+library(coda)
+effectiveSize(Beta) 
+effectiveSize(C) 
+effectiveSize(Z[,1]) 
+effectiveSize(Z[,10]) 
+
+```
+
+acf plots 
+
+```{r}
+acf(Beta,lag.max = 100)
+acf(C,lag.max = 100)
+acf(Z[,1])
+acf(Z[,2])
+
+```
+
+### d) 95% CI for $\beta$ and $P(\beta>0|y,x)$
+```{r}
+quantile(Beta,c(0.025,0.975))
+mean(Beta>0)
+```
+
+\newpage
+
+## Q2 Linear Regression and Lasso Prior.
+
+```{r}
+set.seed(874)
+library(MASS)
+n <- 50
+p <- 10
+X <- mvrnorm(n,rep(0,p),diag(p))
+truebeta <- c(rep(1,p/2),rep(0,p/2))
+Y <- X%*%truebeta + rnorm(n,0,1)
+#-----
+S <- 30000
+beta <- rep(0.5,p)
+tau <- rep(1,p)
+
+Beta <- matrix(,S,p)
+Tau <- matrix(,S,p)
+lambda <- 1
+s=1
+for( s in 1:S){
+  mu <- c()
+  Sigma <- c()
+  for(i in 1:p){
+    Sigma[i] <- 1/(t(X[,i])%*%X[,i] + tau[i]^(-2))
+    mu[i] <- Sigma[i]*t(X[,i])%*%(Y - X[,-i]%*%beta[-i])
+    Beta[s,i] <- rnorm(1,mu[i],sqrt(Sigma[i]))
+    Tau[s,i]=ifelse(beta[i]==0, rgamma(1,shape=1,rate = lambda^2/2)^0.5,rnorm(1,lambda/beta[i],lambda) )
+  }
+  beta <- Beta[s,]
+  tau <- Tau[s,]
+}
+
+cbind(betahat=apply(Beta,2,mean),truebeta)
+
+cbind(lb=apply(Beta,2,quantile,0.025),up = apply(Beta,2,quantile,0.975),truebeta)
+```
